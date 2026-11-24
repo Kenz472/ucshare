@@ -4,8 +4,6 @@ const cheerio = require('cheerio');
 const UA = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36';
 const BACKEND_NYA = 'https://m-intldrive.ucweb.com/1/clouddrive/share/sharepage/video_preview';
 
-// ================= FUNGSI HELPER ================= //
-
 function formatSize(bytes) {
   if (!bytes) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -283,7 +281,6 @@ async function ucshare(url, { getPreview = true } = {}) {
       });
 
       result.videos.push({
-        fid: v.fid,
         file_name: v.file_name,
         original_size: v.size || preview.raw_size,
         ...preview,
@@ -296,9 +293,7 @@ async function ucshare(url, { getPreview = true } = {}) {
   return result;
 }
 
-// Handler kompatibel Vercel Serverless Function & Express
 module.exports = async (req, res) => {
-  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
