@@ -7,76 +7,207 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    body { background: radial-gradient(circle at top, #1e293b, #0f172a); }
+    body { background: radial-gradient(circle at top, #1e293b, #0b0f19); }
+    .glass {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
   </style>
 </head>
 <body class="min-h-screen text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
 
   <div class="max-w-4xl mx-auto w-full">
-    <!-- Nav Link to Docs -->
-    <div class="flex justify-end mb-4">
-      <a href="/docs" class="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5">
-        <i class="fa-solid fa-book"></i> API Documentation
-      </a>
+    <div class="flex justify-between items-center mb-6">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-xs font-semibold tracking-wider text-slate-400 uppercase">API Online</span>
+      </div>
+      <button onclick="toggleModal('docsModal')" class="text-xs bg-slate-800/90 hover:bg-slate-700 text-blue-400 border border-slate-700/80 px-3.5 py-2 rounded-xl transition inline-flex items-center gap-2 shadow-sm cursor-pointer">
+        <i class="fa-solid fa-book-open"></i> API Documentation (/docs)
+      </button>
     </div>
 
-    <!-- Header -->
     <header class="text-center mb-8">
-      <div class="inline-flex items-center justify-center p-3 bg-blue-600/20 text-blue-400 rounded-2xl mb-4 border border-blue-500/30 shadow-lg shadow-blue-500/10">
+      <div class="inline-flex items-center justify-center p-3.5 bg-blue-600/20 text-blue-400 rounded-2xl mb-4 border border-blue-500/30 shadow-lg shadow-blue-500/10">
         <i class="fa-solid fa-cloud-arrow-down text-3xl"></i>
       </div>
-      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">UC-Share Downloader</h1>
-      <p class="text-slate-400 mt-2 text-sm sm:text-base">Ekstrak link unduh langsung dan tonton streaming video UC Drive</p>
+      <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-white">UC-Share Downloader</h1>
+      <p class="text-slate-400 mt-2 text-sm sm:text-base">Ekstrak direct link, streaming video, dan info file UC Drive secara instan</p>
     </header>
 
-    <!-- Search Box -->
-    <div class="bg-slate-800/60 backdrop-blur-md p-4 sm:p-6 rounded-2xl border border-slate-700/60 shadow-xl mb-8">
+    <div class="glass p-4 sm:p-6 rounded-2xl shadow-2xl mb-8">
       <form id="fetchForm" class="flex flex-col sm:flex-row gap-3">
         <div class="relative flex-1">
-          <i class="fa-solid fa-link absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <i class="fa-solid fa-link absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
           <input 
             type="text" 
             id="urlInput" 
             placeholder="Masukkan link uc-share (contoh: https://uc-share.com/s/xxxxxx)" 
             required
-            class="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl focus:outline-none focus:border-blue-500 text-sm transition"
+            class="w-full pl-11 pr-4 py-3.5 bg-slate-900/90 border border-slate-700/80 rounded-xl focus:outline-none focus:border-blue-500 text-sm transition text-white placeholder-slate-500"
           />
         </div>
         <button 
           type="submit" 
           id="btnSubmit"
-          class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3.5 rounded-xl transition shadow-lg shadow-blue-600/30 cursor-pointer disabled:opacity-50"
+          class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-7 py-3.5 rounded-xl transition shadow-lg shadow-blue-600/30 cursor-pointer disabled:opacity-50"
         >
           <span id="btnText">Proses</span>
-          <i id="btnIcon" class="fa-solid fa-arrow-right"></i>
+          <i id="btnIcon" class="fa-solid fa-arrow-right text-xs"></i>
         </button>
       </form>
-      <div id="errorBox" class="hidden mt-4 p-3 bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-sm flex items-center gap-2">
-        <i class="fa-solid fa-circle-exclamation"></i>
+      <div id="errorBox" class="hidden mt-4 p-3.5 bg-rose-500/15 border border-rose-500/30 text-rose-300 rounded-xl text-sm flex items-center gap-3">
+        <i class="fa-solid fa-circle-exclamation shrink-0 text-base"></i>
         <span id="errorMsg">Terjadi kesalahan!</span>
       </div>
     </div>
 
-    <!-- Result Area -->
     <div id="resultContainer" class="hidden space-y-6">
-      <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 flex flex-wrap gap-4 items-center justify-between">
-        <div>
-          <h2 id="shareTitle" class="text-lg font-bold text-white tracking-wide">-</h2>
-          <p class="text-slate-400 text-xs mt-1">
-            Uploader: <span id="shareAuthor" class="text-slate-200 font-medium">-</span> | 
-            Total: <span id="shareTotalSize" class="text-slate-200 font-medium">-</span>
-          </p>
+      <div class="glass rounded-2xl p-5 border border-slate-700/70 shadow-lg">
+        <div class="flex flex-wrap gap-4 items-start justify-between">
+          <div class="space-y-1.5 max-w-xl">
+            <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">Share Info</span>
+            <h2 id="shareTitle" class="text-base sm:text-lg font-bold text-white tracking-wide break-words mt-1">-</h2>
+            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-400 pt-1">
+              <span><i class="fa-solid fa-user text-slate-500 mr-1.5"></i><span id="shareAuthor">-</span></span>
+              <span>•</span>
+              <span><i class="fa-solid fa-database text-slate-500 mr-1.5"></i><span id="shareTotalSize">-</span></span>
+              <span>•</span>
+              <span><i class="fa-solid fa-calendar text-slate-500 mr-1.5"></i><span id="shareDate">-</span></span>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 text-xs">
+            <span id="shareFilesCount" class="bg-slate-800/80 px-3 py-1.5 rounded-lg text-slate-300 font-semibold border border-slate-700">0 File</span>
+            <span id="shareFoldersCount" class="bg-amber-500/20 px-3 py-1.5 rounded-lg text-amber-300 font-semibold border border-amber-500/30 hidden">0 Folder</span>
+          </div>
         </div>
-        <span id="shareFilesCount" class="text-xs bg-slate-700 px-3 py-1 rounded-full text-slate-300 font-semibold border border-slate-600">0 File</span>
       </div>
 
-      <div id="fileList" class="space-y-4"></div>
+      <div id="folderContainer" class="hidden space-y-3">
+        <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
+          <i class="fa-solid fa-folder-open text-amber-400"></i> Folder yang Tersedia
+        </h3>
+        <div id="folderList" class="grid grid-cols-1 gap-2.5"></div>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
+          <i class="fa-solid fa-file-video text-blue-400"></i> Daftar File & Video
+        </h3>
+        <div id="fileList" class="space-y-3"></div>
+      </div>
     </div>
   </div>
 
   <footer class="text-center text-xs text-slate-500 py-6 mt-12">
     Powered by Express.js & UC-Share API
   </footer>
+
+  <div id="videoModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
+        <h3 id="modalVideoTitle" class="text-sm font-semibold text-white truncate max-w-lg">Pemutar Video</h3>
+        <button onclick="closePlayer()" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="relative bg-black aspect-video flex items-center justify-center">
+        <video id="playerElement" controls class="w-full h-full max-h-[70vh]"></video>
+      </div>
+      <div class="p-3 bg-slate-950/70 border-t border-slate-800 flex justify-end gap-2">
+        <a id="modalDownloadBtn" href="#" target="_blank" download class="inline-flex items-center gap-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg transition">
+          <i class="fa-solid fa-download"></i> Unduh File
+        </a>
+        <button onclick="closePlayer()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg transition">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="docsModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+      <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
+        <div class="flex items-center gap-2 text-blue-400">
+          <i class="fa-solid fa-book text-base"></i>
+          <h3 class="text-sm font-bold text-white">Dokumentasi API (/api/ucshare)</h3>
+        </div>
+        <button onclick="toggleModal('docsModal')" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-5 text-xs text-slate-300">
+        <div>
+          <h4 class="font-bold text-white text-sm mb-1.5">Endpoint</h4>
+          <div class="flex items-center gap-2 bg-slate-950 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px]">
+            <span class="bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px]">GET</span>
+            <span class="bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-[10px]">POST</span>
+            <span class="text-slate-200">/api/ucshare</span>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-white text-sm mb-1.5">Parameter Request</h4>
+          <table class="w-full text-left border-collapse border border-slate-800 text-xs">
+            <thead>
+              <tr class="bg-slate-950 text-slate-400">
+                <th class="p-2 border border-slate-800">Parameter</th>
+                <th class="p-2 border border-slate-800">Tipe</th>
+                <th class="p-2 border border-slate-800">Keterangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="p-2 border border-slate-800 font-mono text-blue-400">url</td>
+                <td class="p-2 border border-slate-800 font-mono">string</td>
+                <td class="p-2 border border-slate-800">Wajib. Tautan share UC Drive (misal: https://uc-share.com/s/xxxx)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-white text-sm mb-1.5">Contoh Request (cURL)</h4>
+          <pre class="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">curl -X POST https://domain-anda.com/api/ucshare \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://uc-share.com/s/a687555e17b84"}'</pre>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-white text-sm mb-1.5">Contoh Response (JSON)</h4>
+          <pre class="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-48">{
+  "success": true,
+  "share": {
+    "title": "video.mp4",
+    "pwd_id": "xxxx",
+    "share_url": "https://uc-share.com/s/xxxx",
+    "total_size_formatted": "41.4 MB"
+  },
+  "videos": [
+    {
+      "file_name": "video.mp4",
+      "video_url": "https://pds-sg363...aliyuncs.com/...",
+      "duration": "2m 0s",
+      "resolution": "264x480"
+    }
+  ]
+}</pre>
+        </div>
+      </div>
+      <div class="p-3 bg-slate-950/70 border-t border-slate-800 flex justify-end">
+        <button onclick="toggleModal('docsModal')" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg transition">
+          Mengerti
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white text-xs px-4 py-2.5 rounded-xl shadow-lg transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2">
+    <i class="fa-solid fa-check"></i>
+    <span id="toastMsg">Teks disalin!</span>
+  </div>
 
   <script>
     const form = document.getElementById('fetchForm');
@@ -88,6 +219,12 @@
     const errorMsg = document.getElementById('errorMsg');
     const resultContainer = document.getElementById('resultContainer');
     const fileList = document.getElementById('fileList');
+    const folderContainer = document.getElementById('folderContainer');
+    const folderList = document.getElementById('folderList');
+    const videoModal = document.getElementById('videoModal');
+    const playerElement = document.getElementById('playerElement');
+    const modalVideoTitle = document.getElementById('modalVideoTitle');
+    const modalDownloadBtn = document.getElementById('modalDownloadBtn');
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -97,7 +234,9 @@
       setLoading(true);
       errorBox.classList.add('hidden');
       resultContainer.classList.add('hidden');
+      folderContainer.classList.add('hidden');
       fileList.innerHTML = '';
+      folderList.innerHTML = '';
 
       try {
         const res = await fetch('/api/ucshare', {
@@ -124,52 +263,88 @@
       document.getElementById('shareTitle').innerText = data.share?.title || 'UC Drive Share';
       document.getElementById('shareAuthor').innerText = data.share?.author || '-';
       document.getElementById('shareTotalSize').innerText = data.share?.total_size_formatted || '-';
+      document.getElementById('shareDate').innerText = data.share?.created_at || '-';
       document.getElementById('shareFilesCount').innerText = `${data.total_files || 0} File`;
 
-      const videoMap = {};
-      (data.videos || []).forEach(v => {
-        if (v.fid) videoMap[v.fid] = v;
-      });
+      const foldersCountEl = document.getElementById('shareFoldersCount');
+      if (data.total_folders > 0) {
+        foldersCountEl.innerText = `${data.total_folders} Folder`;
+        foldersCountEl.classList.remove('hidden');
+      } else {
+        foldersCountEl.classList.add('hidden');
+      }
+
+      if (data.folders && data.folders.length > 0) {
+        data.folders.forEach(folder => {
+          const folderCard = document.createElement('div');
+          folderCard.className = "bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 flex items-center justify-between";
+          folderCard.innerHTML = `
+            <div class="flex items-center gap-3 overflow-hidden">
+              <div class="w-9 h-9 bg-amber-500/20 text-amber-400 rounded-lg flex items-center justify-center shrink-0 border border-amber-500/30">
+                <i class="fa-solid fa-folder text-base"></i>
+              </div>
+              <div class="overflow-hidden">
+                <h4 class="font-medium text-xs sm:text-sm text-slate-100 truncate">${folder.name}</h4>
+                <p class="text-[11px] text-slate-400 mt-0.5">${folder.items_count} item di dalam folder</p>
+              </div>
+            </div>
+            <span class="text-[10px] bg-slate-700/60 text-slate-300 px-2 py-1 rounded border border-slate-600/50 shrink-0 font-mono">DIR</span>
+          `;
+          folderList.appendChild(folderCard);
+        });
+        folderContainer.classList.remove('hidden');
+      }
 
       const items = data.files || [];
+      const videos = data.videos || [];
+
       if (items.length === 0) {
-        fileList.innerHTML = '<div class="text-center text-slate-400 py-4">Tidak ada file yang ditemukan.</div>';
+        fileList.innerHTML = '<div class="text-center text-slate-400 py-6">Tidak ada file yang ditemukan.</div>';
       } else {
-        items.forEach((item) => {
-          const videoInfo = videoMap[item.fid];
+        items.forEach((item, index) => {
+          const videoInfo = videos.find(v => v.file_name === item.file_name) || (item.is_video ? videos[index] : null);
           const hasDirectUrl = videoInfo && videoInfo.video_url;
 
           const card = document.createElement('div');
-          card.className = "bg-slate-800/50 border border-slate-700/60 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between";
+          card.className = "glass rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between transition hover:border-slate-600";
           
+          const thumbUrl = videoInfo?.thumbnail_url || item.thumbnail;
+          const displayDuration = videoInfo?.duration || item.duration_formatted;
+          const displayResolution = videoInfo?.resolution || item.resolution;
+          const displaySize = videoInfo?.size_formatted || item.size_formatted;
+
           card.innerHTML = `
-            <div class="flex items-center gap-3 w-full md:w-auto">
-              <div class="w-12 h-12 bg-slate-700/60 rounded-lg flex items-center justify-center text-slate-300 shrink-0 text-xl overflow-hidden border border-slate-700">
-                ${videoInfo?.thumbnail_url 
-                  ? `<img src="${videoInfo.thumbnail_url}" class="w-full h-full object-cover">` 
-                  : (item.is_video ? '<i class="fa-solid fa-file-video text-blue-400"></i>' : '<i class="fa-regular fa-file"></i>')
+            <div class="flex items-center gap-3.5 w-full md:w-auto overflow-hidden">
+              <div class="relative w-14 h-14 bg-slate-800 rounded-lg flex items-center justify-center text-slate-300 shrink-0 overflow-hidden border border-slate-700/80">
+                ${thumbUrl 
+                  ? `<img src="${thumbUrl}" class="w-full h-full object-cover">` 
+                  : (item.is_video ? '<i class="fa-solid fa-file-video text-blue-400 text-xl"></i>' : '<i class="fa-regular fa-file text-xl"></i>')
                 }
+                ${item.is_video ? `<span class="absolute bottom-1 right-1 bg-black/70 px-1 py-0.2 text-[9px] rounded text-white font-mono">${displayDuration}</span>` : ''}
               </div>
-              <div class="overflow-hidden">
-                <h3 class="font-medium text-sm text-slate-100 truncate w-full max-w-sm md:max-w-md" title="${item.file_name}">${item.file_name}</h3>
-                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
-                  <span><i class="fa-solid fa-hard-drive mr-1"></i>${item.size_formatted}</span>
-                  ${item.is_video ? `<span>• <i class="fa-solid fa-clock mr-1"></i>${videoInfo?.duration || item.duration_formatted}</span>` : ''}
-                  ${videoInfo?.resolution ? `<span class="bg-slate-700/50 px-1.5 py-0.5 rounded text-[10px] text-slate-300">${videoInfo.resolution}</span>` : ''}
+              <div class="overflow-hidden flex-1">
+                <h3 class="font-medium text-xs sm:text-sm text-slate-100 truncate w-full max-w-sm md:max-w-md" title="${item.file_name}">${item.file_name}</h3>
+                <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 mt-1">
+                  <span><i class="fa-solid fa-hard-drive mr-1 text-slate-500"></i>${displaySize}</span>
+                  ${displayResolution && displayResolution !== '-' ? `<span class="bg-slate-700/60 px-1.5 py-0.5 rounded text-[10px] text-blue-300 border border-slate-600/50">${displayResolution}</span>` : ''}
+                  ${videoInfo?.codec ? `<span class="bg-slate-700/60 px-1.5 py-0.5 rounded text-[10px] text-slate-300 border border-slate-600/50">${videoInfo.codec}</span>` : ''}
                 </div>
               </div>
             </div>
 
-            <div class="w-full md:w-auto flex items-center gap-2 shrink-0">
+            <div class="w-full md:w-auto flex flex-wrap items-center gap-2 shrink-0">
               ${hasDirectUrl ? `
-                <a href="${videoInfo.video_url}" target="_blank" download="${item.file_name}" class="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-4 py-2.5 rounded-lg transition">
-                  <i class="fa-solid fa-download"></i> Unduh
+                <button onclick="openPlayer('${videoInfo.video_url}', '${encodeURIComponent(item.file_name)}')" class="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition cursor-pointer">
+                  <i class="fa-solid fa-play text-[11px]"></i> Putar
+                </button>
+                <a href="${videoInfo.video_url}" target="_blank" download="${item.file_name}" class="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition">
+                  <i class="fa-solid fa-download text-[11px]"></i> Unduh
                 </a>
-                <a href="${videoInfo.video_url}" target="_blank" class="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium text-xs px-4 py-2.5 rounded-lg transition">
-                  <i class="fa-solid fa-play"></i> Streaming
-                </a>
+                <button onclick="copyLink('${videoInfo.video_url}')" title="Salin Direct Link" class="bg-slate-700/80 hover:bg-slate-600 text-slate-300 p-2.5 rounded-lg transition cursor-pointer">
+                  <i class="fa-solid fa-link text-xs"></i>
+                </button>
               ` : `
-                <span class="text-xs text-slate-500 italic">Preview/Download tidak tersedia</span>
+                <span class="text-xs text-slate-500 italic">Streaming tidak tersedia</span>
               `}
             </div>
           `;
@@ -180,10 +355,49 @@
       resultContainer.classList.remove('hidden');
     }
 
+    function openPlayer(streamUrl, encodedTitle) {
+      const title = decodeURIComponent(encodedTitle);
+      modalVideoTitle.innerText = title;
+      playerElement.src = streamUrl;
+      modalDownloadBtn.href = streamUrl;
+      modalDownloadBtn.setAttribute('download', title);
+      videoModal.classList.remove('hidden');
+      playerElement.play();
+    }
+
+    function closePlayer() {
+      playerElement.pause();
+      playerElement.src = '';
+      videoModal.classList.add('hidden');
+    }
+
+    function toggleModal(modalId) {
+      const target = document.getElementById(modalId);
+      if (target) {
+        target.classList.toggle('hidden');
+      }
+    }
+
+    function copyLink(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast('Direct link berhasil disalin!');
+      });
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.innerText = message;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
     function setLoading(isLoading) {
       btnSubmit.disabled = isLoading;
       btnText.innerText = isLoading ? 'Memproses...' : 'Proses';
-      btnIcon.className = isLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-arrow-right';
+      btnIcon.className = isLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-arrow-right text-xs';
     }
   </script>
 </body>
