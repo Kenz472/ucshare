@@ -34,7 +34,7 @@
         <i class="fa-solid fa-cloud-arrow-down text-3xl"></i>
       </div>
       <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-white">UC-Share Downloader</h1>
-      <p class="text-slate-400 mt-2 text-sm sm:text-base">Ekstrak direct link, streaming video, dan info file UC Drive secara instan</p>
+      <p class="text-slate-400 mt-2 text-sm sm:text-base">Ekstrak direct link, streaming video, dan buka isi folder secara instan</p>
     </header>
 
     <div class="glass p-4 sm:p-6 rounded-2xl shadow-2xl mb-8">
@@ -65,6 +65,17 @@
     </div>
 
     <div id="resultContainer" class="hidden space-y-6">
+      <div id="breadcrumbBar" class="hidden glass rounded-xl px-4 py-3 border border-blue-500/30 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2 text-blue-300 truncate mr-2">
+          <i class="fa-solid fa-folder-tree text-blue-400"></i>
+          <span class="text-slate-400">Folder Aktif:</span>
+          <span id="currentFolderTitle" class="font-semibold text-white truncate">-</span>
+        </div>
+        <button onclick="goBackRoot()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition shrink-0 cursor-pointer">
+          <i class="fa-solid fa-arrow-left"></i> Kembali ke Awal
+        </button>
+      </div>
+
       <div class="glass rounded-2xl p-5 border border-slate-700/70 shadow-lg">
         <div class="flex flex-wrap gap-4 items-start justify-between">
           <div class="space-y-1.5 max-w-xl">
@@ -86,15 +97,18 @@
       </div>
 
       <div id="folderContainer" class="hidden space-y-3">
-        <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
-          <i class="fa-solid fa-folder-open text-amber-400"></i> Folder yang Tersedia
-        </h3>
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
+            <i class="fa-solid fa-folder-open text-amber-400"></i> Folder (Klik untuk buka isi video)
+          </h3>
+          <span class="text-[11px] text-amber-400/80 animate-pulse">Klik folder di bawah</span>
+        </div>
         <div id="folderList" class="grid grid-cols-1 gap-2.5"></div>
       </div>
 
       <div class="space-y-3">
-        <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
-          <i class="fa-solid fa-file-video text-blue-400"></i> Daftar File & Video
+        <h3 id="fileSectionTitle" class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
+          <i class="fa-solid fa-file-video text-blue-400"></i> Daftar Video & File
         </h3>
         <div id="fileList" class="space-y-3"></div>
       </div>
@@ -162,7 +176,7 @@
               <tr>
                 <td class="p-2 border border-slate-800 font-mono text-blue-400">url</td>
                 <td class="p-2 border border-slate-800 font-mono">string</td>
-                <td class="p-2 border border-slate-800">Wajib. Tautan share UC Drive (misal: https://uc-share.com/s/xxxx)</td>
+                <td class="p-2 border border-slate-800">Wajib. Tautan share UC Drive (misal: https://uc-share.com/s/xxxx atau https://uc-share.com/s/xxxx?pdir_fid=yyyy)</td>
               </tr>
             </tbody>
           </table>
@@ -221,16 +235,27 @@
     const fileList = document.getElementById('fileList');
     const folderContainer = document.getElementById('folderContainer');
     const folderList = document.getElementById('folderList');
+    const breadcrumbBar = document.getElementById('breadcrumbBar');
+    const currentFolderTitle = document.getElementById('currentFolderTitle');
+    const fileSectionTitle = document.getElementById('fileSectionTitle');
     const videoModal = document.getElementById('videoModal');
     const playerElement = document.getElementById('playerElement');
     const modalVideoTitle = document.getElementById('modalVideoTitle');
     const modalDownloadBtn = document.getElementById('modalDownloadBtn');
 
+    let baseRootUrl = '';
+    let currentActiveFolder = '';
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const url = urlInput.value.trim();
       if (!url) return;
+      baseRootUrl = url.split('?')[0].split('#')[0];
+      currentActiveFolder = '';
+      await fetchApiData(url);
+    });
 
+    async function fetchApiData(targetUrl, folderName = '') {
       setLoading(true);
       errorBox.classList.add('hidden');
       resultContainer.classList.add('hidden');
@@ -242,7 +267,7 @@
         const res = await fetch('/api/ucshare', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url: targetUrl })
         });
         const data = await res.json();
 
@@ -250,21 +275,48 @@
           throw new Error(data.error || 'Gagal memproses data.');
         }
 
-        renderResult(data);
+        if (!baseRootUrl) {
+          baseRootUrl = (data.share?.share_url || targetUrl).split('?')[0].split('#')[0];
+        }
+
+        renderResult(data, folderName, targetUrl);
       } catch (err) {
         errorMsg.innerText = err.message;
         errorBox.classList.remove('hidden');
       } finally {
         setLoading(false);
       }
-    });
+    }
 
-    function renderResult(data) {
+    function openFolder(fid, name) {
+      currentActiveFolder = name;
+      const targetUrl = `${baseRootUrl}?pdir_fid=${fid}`;
+      urlInput.value = targetUrl;
+      fetchApiData(targetUrl, name);
+    }
+
+    function goBackRoot() {
+      currentActiveFolder = '';
+      urlInput.value = baseRootUrl;
+      fetchApiData(baseRootUrl);
+    }
+
+    function renderResult(data, activeFolderName = '', requestUrl = '') {
       document.getElementById('shareTitle').innerText = data.share?.title || 'UC Drive Share';
       document.getElementById('shareAuthor').innerText = data.share?.author || '-';
       document.getElementById('shareTotalSize').innerText = data.share?.total_size_formatted || '-';
       document.getElementById('shareDate').innerText = data.share?.created_at || '-';
       document.getElementById('shareFilesCount').innerText = `${data.total_files || 0} File`;
+
+      const isSubFolder = requestUrl.includes('pdir_fid') || Boolean(activeFolderName);
+      if (isSubFolder) {
+        currentFolderTitle.innerText = activeFolderName || 'Subfolder';
+        breadcrumbBar.classList.remove('hidden');
+        fileSectionTitle.innerHTML = `<i class="fa-solid fa-folder-open text-blue-400"></i> Isi Video di Folder: <span class="text-white">${activeFolderName || 'Subfolder'}</span>`;
+      } else {
+        breadcrumbBar.classList.add('hidden');
+        fileSectionTitle.innerHTML = `<i class="fa-solid fa-file-video text-blue-400"></i> Daftar Video & File`;
+      }
 
       const foldersCountEl = document.getElementById('shareFoldersCount');
       if (data.total_folders > 0) {
@@ -277,18 +329,30 @@
       if (data.folders && data.folders.length > 0) {
         data.folders.forEach(folder => {
           const folderCard = document.createElement('div');
-          folderCard.className = "bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 flex items-center justify-between";
+          folderCard.className = "cursor-pointer group glass rounded-xl p-4 flex items-center justify-between transition-all duration-200 hover:border-blue-500/80 hover:bg-slate-800/80 hover:shadow-lg hover:shadow-blue-500/5";
+          folderCard.onclick = () => openFolder(folder.fid, folder.name);
+
           folderCard.innerHTML = `
-            <div class="flex items-center gap-3 overflow-hidden">
-              <div class="w-9 h-9 bg-amber-500/20 text-amber-400 rounded-lg flex items-center justify-center shrink-0 border border-amber-500/30">
-                <i class="fa-solid fa-folder text-base"></i>
+            <div class="flex items-center gap-3.5 overflow-hidden">
+              <div class="w-11 h-11 bg-amber-500/20 group-hover:bg-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0 border border-amber-500/30 transition">
+                <i class="fa-solid fa-folder-closed group-hover:hidden text-lg"></i>
+                <i class="fa-solid fa-folder-open hidden group-hover:inline-block text-lg"></i>
               </div>
               <div class="overflow-hidden">
-                <h4 class="font-medium text-xs sm:text-sm text-slate-100 truncate">${folder.name}</h4>
-                <p class="text-[11px] text-slate-400 mt-0.5">${folder.items_count} item di dalam folder</p>
+                <h4 class="font-semibold text-xs sm:text-sm text-slate-100 group-hover:text-blue-300 transition truncate">${folder.name}</h4>
+                <p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                  <span><i class="fa-solid fa-layer-group text-slate-500 mr-1"></i>${folder.items_count} item</span>
+                  <span>•</span>
+                  <span class="text-amber-400 font-medium">Klik untuk buka video</span>
+                </p>
               </div>
             </div>
-            <span class="text-[10px] bg-slate-700/60 text-slate-300 px-2 py-1 rounded border border-slate-600/50 shrink-0 font-mono">DIR</span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-[11px] bg-blue-600/20 group-hover:bg-blue-600 group-hover:text-white text-blue-300 font-medium px-3 py-1.5 rounded-lg border border-blue-500/30 transition flex items-center gap-1.5">
+                <span>Buka</span>
+                <i class="fa-solid fa-chevron-right text-[10px]"></i>
+              </span>
+            </div>
           `;
           folderList.appendChild(folderCard);
         });
@@ -299,7 +363,7 @@
       const videos = data.videos || [];
 
       if (items.length === 0) {
-        fileList.innerHTML = '<div class="text-center text-slate-400 py-6">Tidak ada file yang ditemukan.</div>';
+        fileList.innerHTML = '<div class="text-center text-slate-400 py-6">Tidak ada video atau file di direktori ini.</div>';
       } else {
         items.forEach((item, index) => {
           const videoInfo = videos.find(v => v.file_name === item.file_name) || (item.is_video ? videos[index] : null);
