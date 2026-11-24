@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UC-Share Downloader & Streamer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background: radial-gradient(circle at top, #1e293b, #0f172a); }
+  </style>
+</head>
+<body class="min-h-screen text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8">
+
+  <div class="max-w-4xl mx-auto w-full">
+    <!-- Nav Link to Docs -->
+    <div class="flex justify-end mb-4">
+      <a href="/docs" class="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5">
+        <i class="fa-solid fa-book"></i> API Documentation
+      </a>
+    </div>
+
+    <!-- Header -->
+    <header class="text-center mb-8">
+      <div class="inline-flex items-center justify-center p-3 bg-blue-600/20 text-blue-400 rounded-2xl mb-4 border border-blue-500/30 shadow-lg shadow-blue-500/10">
+        <i class="fa-solid fa-cloud-arrow-down text-3xl"></i>
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight">UC-Share Downloader</h1>
+      <p class="text-slate-400 mt-2 text-sm sm:text-base">Ekstrak link unduh langsung dan tonton streaming video UC Drive</p>
+    </header>
+
+    <!-- Search Box -->
+    <div class="bg-slate-800/60 backdrop-blur-md p-4 sm:p-6 rounded-2xl border border-slate-700/60 shadow-xl mb-8">
+      <form id="fetchForm" class="flex flex-col sm:flex-row gap-3">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-link absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input 
+            type="text" 
+            id="urlInput" 
+            placeholder="Masukkan link uc-share (contoh: https://uc-share.com/s/xxxxxx)" 
+            required
+            class="w-full pl-11 pr-4 py-3.5 bg-slate-900/80 border border-slate-700 rounded-xl focus:outline-none focus:border-blue-500 text-sm transition"
+          />
+        </div>
+        <button 
+          type="submit" 
+          id="btnSubmit"
+          class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-3.5 rounded-xl transition shadow-lg shadow-blue-600/30 cursor-pointer disabled:opacity-50"
+        >
+          <span id="btnText">Proses</span>
+          <i id="btnIcon" class="fa-solid fa-arrow-right"></i>
+        </button>
+      </form>
+      <div id="errorBox" class="hidden mt-4 p-3 bg-rose-500/20 border border-rose-500/30 text-rose-300 rounded-xl text-sm flex items-center gap-2">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <span id="errorMsg">Terjadi kesalahan!</span>
+      </div>
+    </div>
+
+    <!-- Result Area -->
+    <div id="resultContainer" class="hidden space-y-6">
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 flex flex-wrap gap-4 items-center justify-between">
+        <div>
+          <h2 id="shareTitle" class="text-lg font-bold text-white tracking-wide">-</h2>
+          <p class="text-slate-400 text-xs mt-1">
+            Uploader: <span id="shareAuthor" class="text-slate-200 font-medium">-</span> | 
+            Total: <span id="shareTotalSize" class="text-slate-200 font-medium">-</span>
+          </p>
+        </div>
+        <span id="shareFilesCount" class="text-xs bg-slate-700 px-3 py-1 rounded-full text-slate-300 font-semibold border border-slate-600">0 File</span>
+      </div>
+
+      <div id="fileList" class="space-y-4"></div>
+    </div>
+  </div>
+
+  <footer class="text-center text-xs text-slate-500 py-6 mt-12">
+    Powered by Express.js & UC-Share API
+  </footer>
+
+  <script>
+    const form = document.getElementById('fetchForm');
+    const urlInput = document.getElementById('urlInput');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const btnText = document.getElementById('btnText');
+    const btnIcon = document.getElementById('btnIcon');
+    const errorBox = document.getElementById('errorBox');
+    const errorMsg = document.getElementById('errorMsg');
+    const resultContainer = document.getElementById('resultContainer');
+    const fileList = document.getElementById('fileList');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = urlInput.value.trim();
+      if (!url) return;
+
+      setLoading(true);
+      errorBox.classList.add('hidden');
+      resultContainer.classList.add('hidden');
+      fileList.innerHTML = '';
+
+      try {
+        const res = await fetch('/api/ucshare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || 'Gagal memproses data.');
+        }
+
+        renderResult(data);
+      } catch (err) {
+        errorMsg.innerText = err.message;
+        errorBox.classList.remove('hidden');
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    function renderResult(data) {
+      document.getElementById('shareTitle').innerText = data.share?.title || 'UC Drive Share';
+      document.getElementById('shareAuthor').innerText = data.share?.author || '-';
+      document.getElementById('shareTotalSize').innerText = data.share?.total_size_formatted || '-';
+      document.getElementById('shareFilesCount').innerText = `${data.total_files || 0} File`;
+
+      const videoMap = {};
+      (data.videos || []).forEach(v => {
+        if (v.fid) videoMap[v.fid] = v;
+      });
+
+      const items = data.files || [];
+      if (items.length === 0) {
+        fileList.innerHTML = '<div class="text-center text-slate-400 py-4">Tidak ada file yang ditemukan.</div>';
+      } else {
+        items.forEach((item) => {
+          const videoInfo = videoMap[item.fid];
+          const hasDirectUrl = videoInfo && videoInfo.video_url;
+
+          const card = document.createElement('div');
+          card.className = "bg-slate-800/50 border border-slate-700/60 rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between";
+          
+          card.innerHTML = `
+            <div class="flex items-center gap-3 w-full md:w-auto">
+              <div class="w-12 h-12 bg-slate-700/60 rounded-lg flex items-center justify-center text-slate-300 shrink-0 text-xl overflow-hidden border border-slate-700">
+                ${videoInfo?.thumbnail_url 
+                  ? `<img src="${videoInfo.thumbnail_url}" class="w-full h-full object-cover">` 
+                  : (item.is_video ? '<i class="fa-solid fa-file-video text-blue-400"></i>' : '<i class="fa-regular fa-file"></i>')
+                }
+              </div>
+              <div class="overflow-hidden">
+                <h3 class="font-medium text-sm text-slate-100 truncate w-full max-w-sm md:max-w-md" title="${item.file_name}">${item.file_name}</h3>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400 mt-1">
+                  <span><i class="fa-solid fa-hard-drive mr-1"></i>${item.size_formatted}</span>
+                  ${item.is_video ? `<span>• <i class="fa-solid fa-clock mr-1"></i>${videoInfo?.duration || item.duration_formatted}</span>` : ''}
+                  ${videoInfo?.resolution ? `<span class="bg-slate-700/50 px-1.5 py-0.5 rounded text-[10px] text-slate-300">${videoInfo.resolution}</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div class="w-full md:w-auto flex items-center gap-2 shrink-0">
+              ${hasDirectUrl ? `
+                <a href="${videoInfo.video_url}" target="_blank" download="${item.file_name}" class="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-4 py-2.5 rounded-lg transition">
+                  <i class="fa-solid fa-download"></i> Unduh
+                </a>
+                <a href="${videoInfo.video_url}" target="_blank" class="flex-1 md:flex-none inline-flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium text-xs px-4 py-2.5 rounded-lg transition">
+                  <i class="fa-solid fa-play"></i> Streaming
+                </a>
+              ` : `
+                <span class="text-xs text-slate-500 italic">Preview/Download tidak tersedia</span>
+              `}
+            </div>
+          `;
+          fileList.appendChild(card);
+        });
+      }
+
+      resultContainer.classList.remove('hidden');
+    }
+
+    function setLoading(isLoading) {
+      btnSubmit.disabled = isLoading;
+      btnText.innerText = isLoading ? 'Memproses...' : 'Proses';
+      btnIcon.className = isLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-arrow-right';
+    }
+  </script>
+</body>
+</html>
