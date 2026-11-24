@@ -41,6 +41,37 @@ function isVideoFile(item) {
   return /\.(mp4|mov|mkv|avi|webm|3gp|flv|m4v)$/i.test(item.file_name || '');
 }
 
+function formatItems(list) {
+  const files = list
+    .filter(item => !item.dir)
+    .map((item, i) => ({
+      no: i + 1,
+      file_name: item.file_name,
+      fid: item.fid,
+      size: item.size,
+      size_formatted: formatSize(item.size),
+      type: item.format_type || '-',
+      category: item.obj_category || '-',
+      is_video: isVideoFile(item),
+      duration: item.duration || 0,
+      duration_formatted: formatDuration(item.duration),
+      resolution: item.video_max_resolution || '-',
+      thumbnail: item.thumbnail || null,
+      created_at: formatDate(item.created_at),
+      share_fid_token: item.share_fid_token,
+    }));
+
+  const folders = list
+    .filter(item => item.dir)
+    .map(item => ({
+      name: item.file_name,
+      fid: item.fid,
+      items_count: item.include_items || 0,
+    }));
+
+  return { files, folders };
+}
+
 function extractInitialProps(html) {
   const start = html.indexOf('window.__INITIAL_PROPS__');
   if (start === -1) return null;
@@ -97,32 +128,7 @@ function parseFromJson(props) {
     const list = data.shareDetail?.list || [];
     const author = data.stokenDetail?.author || {};
 
-    const files = list
-      .filter(item => !item.dir)
-      .map((item, i) => ({
-        no: i + 1,
-        file_name: item.file_name,
-        fid: item.fid,
-        size: item.size,
-        size_formatted: formatSize(item.size),
-        type: item.format_type || '-',
-        category: item.obj_category || '-',
-        is_video: isVideoFile(item),
-        duration: item.duration || 0,
-        duration_formatted: formatDuration(item.duration),
-        resolution: item.video_max_resolution || '-',
-        thumbnail: item.thumbnail || null,
-        created_at: formatDate(item.created_at),
-        share_fid_token: item.share_fid_token,
-      }));
-
-    const folders = list
-      .filter(item => item.dir)
-      .map(item => ({
-        name: item.file_name,
-        fid: item.fid,
-        items_count: item.include_items || 0,
-      }));
+    const { files, folders } = formatItems(list);
 
     return {
       success: true,
@@ -185,6 +191,48 @@ function parseFromHtml(html) {
   };
 }
 
+async function getFolderDetail({ pwd_id, stoken, pdir_fid, shareUrl }) {
+  const apis = [
+    'https://m-intldrive.ucweb.com/1/clouddrive/share/sharepage/v2/detail',
+    'https://m-intldrive.ucweb.com/1/clouddrive/share/sharepage/detail'
+  ];
+
+  const params = {
+    pr: 'UCBrowser',
+    fr: 'h5',
+    __t: Date.now(),
+    pwd_id,
+    stoken,
+    pdir_fid: pdir_fid || '0',
+    force: 0,
+    _page: 1,
+    _size: 100,
+    _fetch_total: 1,
+    _sort: 'file_type:asc,updated_at:desc'
+  };
+
+  for (const api of apis) {
+    try {
+      const { data } = await axios.get(api, {
+        params,
+        headers: {
+          'User-Agent': UA,
+          'Accept': 'application/json, text/plain, */*',
+          'Referer': shareUrl,
+          'Origin': 'https://uc-share.com',
+        },
+        timeout: 15000,
+      });
+
+      if (data?.code === 0 && Array.isArray(data?.data?.list)) {
+        return data.data.list;
+      }
+    } catch {}
+  }
+
+  return [];
+}
+
 async function getVideoPreview({ pwd_id, stoken, fid, fid_token, path_no, shareUrl }) {
   const params = {
     pr: 'UCBrowser',
@@ -225,14 +273,16 @@ async function getVideoPreview({ pwd_id, stoken, fid, fid_token, path_no, shareU
   };
 }
 
-async function ucshare(url, { getPreview = true } = {}) {
+async function ucshare(url, { pdir_fid = null, getPreview = true } = {}) {
   let targetUrl = url.trim();
   if (!targetUrl.startsWith('http')) {
     targetUrl = `https://uc-share.com/s/${targetUrl}`;
   }
 
-  const separator = targetUrl.includes('?') ? '&' : '?';
-  targetUrl = `${targetUrl}${separator}la=id`;
+  if (!targetUrl.includes('la=')) {
+    const separator = targetUrl.includes('?') ? '&' : '?';
+    targetUrl = `${targetUrl}${separator}la=id`;
+  }
 
   const { data: html } = await axios.get(targetUrl, {
     headers: {
@@ -254,10 +304,36 @@ async function ucshare(url, { getPreview = true } = {}) {
   result.url = targetUrl;
   result.videos = [];
 
-  if (!getPreview) return result;
-
   const pwd_id = result.share?.pwd_id || targetUrl.match(/\/s\/([^/?#]+)/)?.[1];
   const stoken = findStoken(html, props);
+
+  let targetPdirFid = pdir_fid || targetUrl.match(/[?&]pdir_fid=([^&#]+)/)?.[1];
+
+  if (!targetPdirFid && result.files.length === 0 && result.folders.length > 0) {
+    targetPdirFid = result.folders[0].fid;
+  }
+
+  if (targetPdirFid && pwd_id && stoken) {
+    const subList = await getFolderDetail({
+      pwd_id,
+      stoken,
+      pdir_fid: targetPdirFid,
+      shareUrl: targetUrl,
+    });
+
+    if (subList.length > 0) {
+      const parsed = formatItems(subList);
+      result.active_folder_fid = targetPdirFid;
+      result.files = parsed.files;
+      result.total_files = parsed.files.length;
+      if (parsed.folders.length > 0) {
+        result.sub_folders = parsed.folders;
+      }
+    }
+  }
+
+  if (!getPreview) return result;
+
   const videos = (result.files || []).filter(f => f.is_video && f.fid);
 
   if (videos.length === 0) {
@@ -308,6 +384,7 @@ module.exports = async (req, res) => {
 
   try {
     const url = req.method === 'POST' ? req.body?.url : req.query?.url;
+    const pdir_fid = req.method === 'POST' ? req.body?.pdir_fid : req.query?.pdir_fid;
 
     if (!url) {
       return res.status(400).json({
@@ -316,7 +393,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    const data = await ucshare(url);
+    const data = await ucshare(url, { pdir_fid });
     return res.status(200).json(data);
   } catch (err) {
     return res.status(500).json({
