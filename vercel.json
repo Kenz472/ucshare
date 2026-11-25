@@ -5,6 +5,10 @@
       "source": "/api/ucshare",
       "destination": "/api/ucshare.js"
     },
+    {   
+      "source": "/api/terabox",
+      "destination": "/api/terabox.js"
+    },
     {
       "source": "/docs",
       "destination": "/public/docs.html"
