@@ -85,11 +85,11 @@
       <div id="breadcrumbBar" class="hidden glass rounded-xl px-4 py-3 border border-blue-500/30 flex items-center justify-between text-xs">
         <div class="flex items-center gap-2 text-blue-300 truncate mr-2">
           <i class="fa-solid fa-folder-tree text-blue-400"></i>
-          <span class="text-slate-400">Folder:</span>
+          <span class="text-slate-400">Folder Aktif:</span>
           <span id="currentFolderTitle" class="font-semibold text-white truncate">-</span>
         </div>
         <button onclick="goBackRoot()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition shrink-0 cursor-pointer">
-          <i class="fa-solid fa-arrow-left"></i> Awal
+          <i class="fa-solid fa-arrow-left"></i> Kembali ke Awal
         </button>
       </div>
 
@@ -101,6 +101,8 @@
             <h2 id="shareTitle" class="text-base sm:text-lg font-bold text-white tracking-wide break-words mt-1">-</h2>
             <div id="shareMeta" class="flex flex-wrap items-center gap-3 text-xs text-slate-400 pt-1">
               <span id="shareTotalSize"><i class="fa-solid fa-database text-slate-500 mr-1.5"></i>-</span>
+              <span id="shareAuthor" class="hidden"><i class="fa-solid fa-user text-slate-500 mr-1.5"></i>-</span>
+              <span id="shareExpire" class="hidden"><i class="fa-regular fa-clock text-slate-500 mr-1.5"></i>-</span>
             </div>
           </div>
           <div class="flex flex-wrap gap-2 text-xs">
@@ -115,7 +117,7 @@
         <h3 class="text-xs uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-2">
           <i class="fa-solid fa-folder-open text-amber-400"></i> Folder Tersedia
         </h3>
-        <div id="folderList" class="grid grid-cols-1 gap-2.5"></div>
+        <div id="folderList" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
       </div>
 
       <!-- File List -->
@@ -130,15 +132,15 @@
   </div>
 
   <footer class="text-center text-xs text-slate-500 py-6 mt-12">
-    Powered by Express.js, TeraBox & UC-Share API
+    Universal Downloader • TeraBox & UC-Share
   </footer>
 
-  <!-- Modal Pemutar Video dengan HLS Engine -->
+  <!-- Modal Pemutar Video -->
   <div id="videoModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl">
       <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
         <h3 id="modalVideoTitle" class="text-sm font-semibold text-white truncate max-w-lg">Pemutar Video</h3>
-        <button onclick="closePlayer()" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition">
+        <button onclick="closePlayer()" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition cursor-pointer">
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
@@ -149,7 +151,7 @@
         <a id="modalDownloadBtn" href="#" target="_blank" download class="inline-flex items-center gap-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg transition">
           <i class="fa-solid fa-download"></i> Unduh File
         </a>
-        <button onclick="closePlayer()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg transition">
+        <button onclick="closePlayer()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg transition cursor-pointer">
           Tutup
         </button>
       </div>
@@ -187,13 +189,15 @@
   <!-- Toast -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white text-xs px-4 py-2.5 rounded-xl shadow-lg transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2">
     <i class="fa-solid fa-check"></i>
-    <span id="toastMsg">Tautan disalin!</span>
+    <span id="toastMsg">Tautan disalin ke clipboard!</span>
   </div>
 
   <script>
-    let activeMode = 'auto'; // 'auto' | 'terabox' | 'ucshare'
+    let activeMode = 'auto';
     let hlsInstance = null;
     let baseRootUrl = '';
+    // Global state untuk menyimpan item media saat ini agar aman dari karakter petik/URL escaping
+    let currentRenderedFiles = [];
 
     const form = document.getElementById('fetchForm');
     const urlInput = document.getElementById('urlInput');
@@ -251,6 +255,7 @@
       folderContainer.classList.add('hidden');
       fileList.innerHTML = '';
       folderList.innerHTML = '';
+      currentRenderedFiles = [];
 
       const service = detectTargetApi(targetUrl);
       const endpoint = service === 'terabox' ? '/api/terabox' : '/api/ucshare';
@@ -263,11 +268,11 @@
         });
         const resData = await res.json();
 
-        if (!res.ok) {
-          throw new Error(resData.error || resData.message || 'Gagal memproses link.');
+        // Cek error HTTP maupun status flag API internal
+        if (!res.ok || resData.success === false) {
+          throw new Error(resData.message || resData.error || 'Gagal memproses tautan.');
         }
 
-        // Support direct { Result: [...] } atau { data: { Result: [...] } }
         const data = resData.data ? resData.data : resData;
 
         if (service === 'terabox' || data.Result) {
@@ -297,13 +302,21 @@
       
       const totalSizeCalc = items.reduce((acc, cur) => acc + (cur.size || 0), 0);
       document.getElementById('shareTotalSize').innerHTML = `<i class="fa-solid fa-database text-slate-500 mr-1.5"></i>${formatBytes(totalSizeCalc)}`;
+      document.getElementById('shareAuthor').classList.add('hidden');
+      document.getElementById('shareExpire').classList.add('hidden');
       document.getElementById('shareFilesCount').innerText = `${items.length} File`;
       document.getElementById('shareFoldersCount').classList.add('hidden');
       breadcrumbBar.classList.add('hidden');
       fileSectionTitle.innerHTML = `<i class="fa-solid fa-film text-sky-400"></i> File TeraBox Tersedia (${items.length})`;
 
       fileList.innerHTML = '';
-      items.forEach((item) => {
+      currentRenderedFiles = items.map(item => ({
+        title: item.filename,
+        streamUrl: item.fast_stream_url || '',
+        downloadUrl: item.downloadUrl || item.fast_stream_url || ''
+      }));
+
+      items.forEach((item, idx) => {
         const streamUrl = item.fast_stream_url || '';
         const downloadUrl = item.downloadUrl || streamUrl;
         const isActive = item.link_status === 'active';
@@ -331,7 +344,7 @@
 
           <div class="w-full md:w-auto flex flex-wrap items-center gap-2 shrink-0">
             ${streamUrl ? `
-              <button onclick="playStream('${streamUrl}', '${encodeURIComponent(item.filename)}', '${downloadUrl}')" class="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition cursor-pointer">
+              <button onclick="playItem(${idx})" class="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition cursor-pointer">
                 <i class="fa-solid fa-play text-[11px]"></i> Putar
               </button>
             ` : ''}
@@ -340,7 +353,7 @@
               <a href="${downloadUrl}" target="_blank" download="${item.filename}" class="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition">
                 <i class="fa-solid fa-download text-[11px]"></i> Unduh
               </a>
-              <button onclick="copyLink('${downloadUrl}')" title="Salin Direct Link" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-lg border border-slate-700 transition cursor-pointer">
+              <button onclick="copyItemLink(${idx})" title="Salin Direct Link" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-lg border border-slate-700 transition cursor-pointer">
                 <i class="fa-solid fa-link text-xs"></i>
               </button>
             ` : ''}
@@ -357,42 +370,61 @@
       document.getElementById('platformBadge').innerText = 'UC-Share Drive';
       document.getElementById('platformBadge').className = 'text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30';
 
-      document.getElementById('shareTitle').innerText = data.share?.title || 'UC Drive Share';
+      // 1. Tampilkan Info Share & Pengunggah
+      document.getElementById('shareTitle').innerText = data.share?.title || 'UC Drive Shared Content';
       document.getElementById('shareTotalSize').innerHTML = `<i class="fa-solid fa-database text-slate-500 mr-1.5"></i>${data.share?.total_size_formatted || '-'}`;
-      document.getElementById('shareFilesCount').innerText = `${data.total_files || 0} File`;
+      
+      const authorEl = document.getElementById('shareAuthor');
+      if (data.share?.author) {
+        authorEl.innerHTML = `<i class="fa-solid fa-user text-slate-500 mr-1.5"></i>${data.share.author}`;
+        authorEl.classList.remove('hidden');
+      } else {
+        authorEl.classList.add('hidden');
+      }
 
+      const expireEl = document.getElementById('shareExpire');
+      if (data.share?.is_permanent) {
+        expireEl.innerHTML = `<i class="fa-solid fa-infinity text-emerald-400 mr-1.5"></i>Permanen`;
+        expireEl.classList.remove('hidden');
+      } else if (data.share?.expired_at) {
+        expireEl.innerHTML = `<i class="fa-regular fa-clock text-slate-500 mr-1.5"></i>Exp: ${data.share.expired_at.split(' ')[0]}`;
+        expireEl.classList.remove('hidden');
+      } else {
+        expireEl.classList.add('hidden');
+      }
+
+      document.getElementById('shareFilesCount').innerText = `${data.total_files || (data.files ? data.files.length : 0)} File`;
+
+      // 2. Breadcrumb Folder
       const isSubFolder = requestUrl.includes('pdir_fid') || Boolean(activeFolderName);
       if (isSubFolder) {
         currentFolderTitle.innerText = activeFolderName || 'Subfolder';
         breadcrumbBar.classList.remove('hidden');
-        fileSectionTitle.innerHTML = `<i class="fa-solid fa-folder-open text-blue-400"></i> Isi Video: <span class="text-white">${activeFolderName}</span>`;
+        fileSectionTitle.innerHTML = `<i class="fa-solid fa-folder-open text-blue-400"></i> Isi Direktori: <span class="text-white">${activeFolderName}</span>`;
       } else {
         breadcrumbBar.classList.add('hidden');
         fileSectionTitle.innerHTML = `<i class="fa-solid fa-file-video text-blue-400"></i> Daftar Video & File`;
       }
 
+      // 3. Render Folder List
       const foldersCountEl = document.getElementById('shareFoldersCount');
-      if (data.total_folders > 0) {
+      if (data.total_folders > 0 && data.folders && data.folders.length > 0) {
         foldersCountEl.innerText = `${data.total_folders} Folder`;
         foldersCountEl.classList.remove('hidden');
-      } else {
-        foldersCountEl.classList.add('hidden');
-      }
 
-      if (data.folders && data.folders.length > 0) {
         data.folders.forEach(folder => {
           const folderCard = document.createElement('div');
-          folderCard.className = "cursor-pointer group glass rounded-xl p-4 flex items-center justify-between transition-all duration-200 hover:border-blue-500/80 hover:bg-slate-800/80";
+          folderCard.className = "cursor-pointer group glass rounded-xl p-3.5 flex items-center justify-between transition-all duration-200 hover:border-blue-500/80 hover:bg-slate-800/80";
           folderCard.onclick = () => openFolder(folder.fid, folder.name);
 
           folderCard.innerHTML = `
-            <div class="flex items-center gap-3.5 overflow-hidden">
-              <div class="w-11 h-11 bg-amber-500/20 group-hover:bg-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0 border border-amber-500/30 transition">
-                <i class="fa-solid fa-folder-open text-lg"></i>
+            <div class="flex items-center gap-3 overflow-hidden">
+              <div class="w-10 h-10 bg-amber-500/20 group-hover:bg-amber-500/30 text-amber-400 rounded-xl flex items-center justify-center shrink-0 border border-amber-500/30 transition">
+                <i class="fa-solid fa-folder-open text-base"></i>
               </div>
               <div class="overflow-hidden">
                 <h4 class="font-semibold text-xs sm:text-sm text-slate-100 group-hover:text-blue-300 transition truncate">${folder.name}</h4>
-                <p class="text-[11px] text-slate-400 mt-0.5">${folder.items_count} item • <span class="text-amber-400">Buka Folder</span></p>
+                <p class="text-[11px] text-slate-400 mt-0.5">${folder.items_count} item • <span class="text-amber-400 font-medium">Buka Folder</span></p>
               </div>
             </div>
             <i class="fa-solid fa-chevron-right text-slate-500 text-xs"></i>
@@ -400,43 +432,78 @@
           folderList.appendChild(folderCard);
         });
         folderContainer.classList.remove('hidden');
+      } else {
+        foldersCountEl.classList.add('hidden');
+        folderContainer.classList.add('hidden');
       }
 
-      const items = data.files || [];
+      // 4. Render Files & Videos
+      const items = (data.files && data.files.length > 0) ? data.files : (data.videos || []);
       const videos = data.videos || [];
 
       if (items.length === 0) {
-        fileList.innerHTML = '<div class="text-center text-slate-400 py-6">Tidak ada video atau file di direktori ini.</div>';
+        fileList.innerHTML = '<div class="text-center text-slate-400 py-8 glass rounded-xl">Tidak ada file di folder ini.</div>';
       } else {
+        currentRenderedFiles = items.map((item, index) => {
+          const videoInfo = videos.find(v => v.file_name === item.file_name) || (item.is_video ? videos[index] : null);
+          const directUrl = videoInfo?.video_url || item.download_url || '';
+          return {
+            title: item.file_name || 'UC Video File',
+            streamUrl: directUrl,
+            downloadUrl: directUrl
+          };
+        });
+
         items.forEach((item, index) => {
           const videoInfo = videos.find(v => v.file_name === item.file_name) || (item.is_video ? videos[index] : null);
           const hasDirectUrl = videoInfo && videoInfo.video_url;
+
+          // Dapatkan info ukuran, resolusi, durasi terbaik dari file atau video object
+          const displaySize = item.size_formatted || videoInfo?.size_formatted || formatBytes(item.size);
+          const displayDuration = item.duration_formatted || videoInfo?.duration || '';
+          const displayResolution = videoInfo?.resolution || item.resolution || '';
+          const thumbnailSrc = item.thumbnail || videoInfo?.thumbnail_url;
 
           const card = document.createElement('div');
           card.className = "glass rounded-xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between transition hover:border-slate-600";
 
           card.innerHTML = `
             <div class="flex items-center gap-3.5 w-full md:w-auto overflow-hidden">
-              <div class="relative w-14 h-14 bg-slate-800 rounded-lg flex items-center justify-center text-slate-300 shrink-0 overflow-hidden border border-slate-700/80">
-                ${item.thumbnail ? `<img src="${item.thumbnail}" class="w-full h-full object-cover">` : '<i class="fa-solid fa-file-video text-blue-400 text-xl"></i>'}
+              <div class="relative w-16 h-14 bg-slate-900 rounded-lg flex items-center justify-center text-slate-400 shrink-0 overflow-hidden border border-slate-700/80">
+                ${thumbnailSrc ? `
+                  <img src="${thumbnailSrc}" class="w-full h-full object-cover" onerror="this.onerror=null;this.parentElement.innerHTML='<i class=\\'fa-solid fa-file-video text-blue-400 text-lg\\'></i>'"/>
+                ` : `<i class="fa-solid fa-file-video text-blue-400 text-lg"></i>`}
               </div>
               <div class="overflow-hidden flex-1">
-                <h3 class="font-medium text-xs sm:text-sm text-slate-100 truncate w-full max-w-sm md:max-w-md">${item.file_name}</h3>
+                <h3 class="font-medium text-xs sm:text-sm text-slate-100 truncate w-full max-w-sm md:max-w-md" title="${item.file_name}">
+                  ${item.file_name}
+                </h3>
                 <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 mt-1">
-                  <span>${item.size_formatted || '-'}</span>
+                  <span><i class="fa-solid fa-hard-drive mr-1 text-slate-500"></i>${displaySize}</span>
+                  ${displayDuration ? `<span>•</span><span><i class="fa-regular fa-clock mr-1 text-slate-500"></i>${displayDuration}</span>` : ''}
+                  ${displayResolution ? `
+                    <span class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 uppercase">
+                      ${displayResolution}
+                    </span>
+                  ` : ''}
                 </div>
               </div>
             </div>
 
             <div class="w-full md:w-auto flex flex-wrap items-center gap-2 shrink-0">
               ${hasDirectUrl ? `
-                <button onclick="playStream('${videoInfo.video_url}', '${encodeURIComponent(item.file_name)}', '${videoInfo.video_url}')" class="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition cursor-pointer">
+                <button onclick="playItem(${index})" class="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition cursor-pointer">
                   <i class="fa-solid fa-play text-[11px]"></i> Putar
                 </button>
                 <a href="${videoInfo.video_url}" target="_blank" download="${item.file_name}" class="flex-1 md:flex-none inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs px-3.5 py-2.5 rounded-lg transition">
                   <i class="fa-solid fa-download text-[11px]"></i> Unduh
                 </a>
-              ` : `<span class="text-xs text-slate-500 italic">Streaming tidak tersedia</span>`}
+                <button onclick="copyItemLink(${index})" title="Salin Direct Link" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-lg border border-slate-700 transition cursor-pointer">
+                  <i class="fa-solid fa-link text-xs"></i>
+                </button>
+              ` : `
+                <span class="text-xs text-slate-500 italic px-2">Streaming tidak tersedia</span>
+              `}
             </div>
           `;
           fileList.appendChild(card);
@@ -446,40 +513,45 @@
       resultContainer.classList.remove('hidden');
     }
 
-    // ================= VIDEO PLAYER (HLS SUPPORT) =================
-    function playStream(mediaUrl, encodedTitle, downloadUrl = '#') {
-      const title = decodeURIComponent(encodedTitle);
-      modalVideoTitle.innerText = title;
-      modalDownloadBtn.href = downloadUrl;
-      modalDownloadBtn.setAttribute('download', title);
+    // ================= MEDIA PLAYER & ACTIONS =================
+    function playItem(index) {
+      const media = currentRenderedFiles[index];
+      if (!media || !media.streamUrl) return;
 
-      // Bersihkan HLS player lama jika ada
+      modalVideoTitle.innerText = media.title;
+      modalDownloadBtn.href = media.downloadUrl;
+      modalDownloadBtn.setAttribute('download', media.title);
+
       if (hlsInstance) {
         hlsInstance.destroy();
         hlsInstance = null;
       }
 
-      // Deteksi ekstensi .m3u8 (HLS stream TeraBox)
-      if (mediaUrl.includes('.m3u8')) {
+      // Deteksi stream HLS TeraBox (.m3u8) vs MP4 reguler UC-Share
+      if (media.streamUrl.includes('.m3u8')) {
         if (Hls.isSupported()) {
           hlsInstance = new Hls({ enableWorker: true });
-          hlsInstance.loadSource(mediaUrl);
+          hlsInstance.loadSource(media.streamUrl);
           hlsInstance.attachMedia(playerElement);
           hlsInstance.on(Hls.Events.MANIFEST_PARSED, function () {
             playerElement.play().catch(e => console.log('Autoplay dicegah browser:', e));
           });
         } else if (playerElement.canPlayType('application/vnd.apple.mpegurl')) {
-          // Native Safari / iOS
-          playerElement.src = mediaUrl;
+          playerElement.src = media.streamUrl;
           playerElement.play();
         }
       } else {
-        // MP4 biasa (UC-Share)
-        playerElement.src = mediaUrl;
-        playerElement.play();
+        playerElement.src = media.streamUrl;
+        playerElement.play().catch(e => console.log('Autoplay dicegah browser:', e));
       }
 
       videoModal.classList.remove('hidden');
+    }
+
+    function copyItemLink(index) {
+      const media = currentRenderedFiles[index];
+      if (!media || !media.downloadUrl) return;
+      copyLink(media.downloadUrl);
     }
 
     function closePlayer() {
